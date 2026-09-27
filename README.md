@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/32705922/README.md)
 
 Projeto em Python, Django 5.2 e SQLite. Requer Python 3.10 ou superior.
 
