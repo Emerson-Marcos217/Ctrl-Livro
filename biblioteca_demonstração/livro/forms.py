@@ -11,10 +11,17 @@ class FormularioLivro(forms.ModelForm):
 
     class Meta:
         model = Livro
-        fields = ["nome", "autor", "co_autor", "categoria", "sinopse", "ativo"]
+        fields = ["nome", "autor", "co_autor", "categorias", "sinopse", "ativo"]
         widgets = {
             "sinopse": forms.Textarea(attrs={"rows": 4}),
+            "categorias": forms.CheckboxSelectMultiple(attrs={"class": "category-options"}),
         }
+
+    def clean_categorias(self):
+        categorias = self.cleaned_data["categorias"]
+        if len(categorias) > 3:
+            raise forms.ValidationError("Selecione no máximo 3 categorias por livro.")
+        return categorias
 
 
 class FormularioNovoLivro(FormularioLivro):
