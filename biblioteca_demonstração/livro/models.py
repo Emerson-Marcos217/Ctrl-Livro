@@ -27,11 +27,12 @@ class Livro(models.Model):
     co_autor = models.CharField("Coautor", max_length=150, blank=True)
     sinopse = models.TextField("Sinopse", blank=True)
 
-    # ForeignKey liga um registro a outro. Um livro tem uma categoria.
-    categoria = models.ForeignKey(
+    # Um livro pode pertencer a até três categorias.
+    categorias = models.ManyToManyField(
         Categoria,
-        on_delete=models.PROTECT,
-        verbose_name="Categoria",
+        related_name="livros",
+        verbose_name="Categorias",
+        help_text="Selecione de 1 a 3 categorias.",
     )
     cadastrado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
