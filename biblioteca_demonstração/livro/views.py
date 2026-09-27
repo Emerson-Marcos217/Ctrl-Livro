@@ -48,10 +48,10 @@ def mostrar_erro_de_emprestimo(request, erro):
 def listar_livros(request):
     """Mostra o catálogo e aplica os filtros escolhidos pelo leitor."""
     texto_da_busca = request.GET.get("q", "").strip()
-    id_categoria = request.GET.get("categoria", "")
+    ids_categorias = [valor for valor in request.GET.getlist("categoria") if valor.isascii() and valor.isdigit() and len(valor) <= 18]
     somente_disponiveis = request.GET.get("disponivel")
 
-    livros = Livro.objects.filter(ativo=True).select_related("categoria")
+    livros = Livro.objects.filter(ativo=True).prefetch_related("categorias")
 
     # Cria uma contagem de cópias disponíveis para cada título.
     livros = livros.annotate(
@@ -66,11 +66,12 @@ def listar_livros(request):
             Q(nome__icontains=texto_da_busca)
             | Q(autor__icontains=texto_da_busca)
             | Q(co_autor__icontains=texto_da_busca)
-            | Q(categoria__nome__icontains=texto_da_busca)
+            | Q(pk__in=Livro.objects.filter(categorias__nome__icontains=texto_da_busca))
         )
 
-    if id_categoria.isdigit():
-        livros = livros.filter(categoria_id=id_categoria)
+    if ids_categorias:
+        # A subconsulta evita repetir livros e multiplicar a contagem de cópias.
+        livros = livros.filter(pk__in=Livro.objects.filter(categorias__pk__in=ids_categorias))
 
     if somente_disponiveis:
         livros = livros.filter(disponiveis__gt=0)
@@ -87,7 +88,7 @@ def listar_livros(request):
         "pagina": pagina,
         "busca": texto_da_busca,
         "categorias": Categoria.objects.all(),
-        "categoria_atual": id_categoria,
+        "categorias_atuais": ids_categorias,
         "parametros": filtros_da_busca.urlencode(),
         "total": paginador.count,
     }
@@ -97,7 +98,7 @@ def listar_livros(request):
 @login_required
 def mostrar_detalhes_livro(request, id_livro):
     """Exibe o livro, a disponibilidade e o pedido atual do leitor."""
-    livros = Livro.objects.select_related("categoria")
+    livros = Livro.objects.prefetch_related("categorias")
 
     if not request.user.has_perm("livro.change_livro"):
         livros = livros.filter(ativo=True)
@@ -319,7 +320,7 @@ def registrar_devolucao(request, id_emprestimo):
 def listar_acervo_bibliotecario(request):
     """Lista todos os títulos, inclusive os que estão ocultos para leitores."""
     texto_da_busca = request.GET.get("q", "").strip()
-    livros = Livro.objects.select_related("categoria")
+    livros = Livro.objects.prefetch_related("categorias")
     livros = livros.annotate(total=Count("exemplares")).order_by("nome", "id")
 
     if texto_da_busca:
@@ -348,6 +349,7 @@ def cadastrar_livro(request):
                 livro = formulario.save(commit=False)
                 livro.cadastrado_por = request.user
                 livro.save()
+                formulario.save_m2m()
 
                 quantidade = formulario.cleaned_data["quantidade"]
                 for numero_do_exemplar in range(quantidade):
