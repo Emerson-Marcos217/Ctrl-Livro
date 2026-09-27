@@ -25,7 +25,8 @@ class BibliotecaTests(TestCase):
         cls.leitor.groups.add(Group.objects.get(name="Leitor"))
         cls.categoria = Categoria.objects.create(nome="Literatura")
         cls.livro = Livro.objects.create(nome="Dom Casmurro", autor="Machado de Assis",
-            categoria=cls.categoria, cadastrado_por=cls.biblio)
+            cadastrado_por=cls.biblio)
+        cls.livro.categorias.add(cls.categoria)
         cls.exemplar = Exemplar.objects.create(livro=cls.livro, codigo="EX-001")
 
     def pedido(self, leitor=None):
@@ -206,7 +207,8 @@ class BibliotecaTests(TestCase):
 
     def test_catalogo_busca_categoria_disponibilidade(self):
         outra = Livro.objects.create(nome="Outro título", autor="Outro autor",
-            categoria=self.categoria, cadastrado_por=self.biblio)
+            cadastrado_por=self.biblio)
+        outra.categorias.add(self.categoria)
         self.login_leitor()
         self.assertContains(self.client.get(reverse("catalogo"), {"q": "Machado"}), "Dom Casmurro")
         self.assertNotContains(self.client.get(reverse("catalogo"), {"q": "Machado"}), "Outro título")
@@ -221,19 +223,109 @@ class BibliotecaTests(TestCase):
         self.client.post(reverse("nova_categoria"), {"nome": "Ciência", "descricao": "Pesquisa"})
         self.assertTrue(Categoria.objects.filter(nome="Ciência").exists())
         response = self.client.post(reverse("novo_livro"), {
-            "nome": "Novo livro", "autor": "Nova autora", "categoria": self.categoria.pk,
+            "nome": "Novo livro", "autor": "Nova autora", "categorias": [self.categoria.pk],
             "quantidade": 2, "ativo": "on", "cadastrado_por": self.leitor.pk})
         livro = Livro.objects.get(nome="Novo livro")
         self.assertEqual(response.status_code, 302)
         self.assertEqual(livro.cadastrado_por, self.biblio)
         self.assertEqual(livro.exemplares.count(), 2)
         self.client.post(reverse("editar_livro", args=[livro.pk]), {
-            "nome": "Título alterado", "autor": "Nova autora", "categoria": self.categoria.pk})
+            "nome": "Título alterado", "autor": "Nova autora", "categorias": [self.categoria.pk]})
         livro.refresh_from_db()
         self.assertFalse(livro.ativo)
         self.client.post(reverse("novo_exemplar", args=[livro.pk]), {"codigo": "manual-001"})
         self.assertTrue(livro.exemplares.filter(codigo="MANUAL-001").exists())
         self.assertContains(self.client.get(reverse("detalhe_livro", args=[livro.pk])), "MANUAL-001")
+
+    def test_cadastro_com_tres_categorias_e_edicao(self):
+        categorias = [self.categoria] + [
+            Categoria.objects.create(nome=nome) for nome in ["Romance", "Clássico"]
+        ]
+        ids = [categoria.pk for categoria in categorias]
+        self.client.force_login(self.biblio)
+        dados = {"nome": "Três temas", "autor": "Autora", "categorias": ids,
+                 "quantidade": 2, "ativo": "on"}
+        resposta = self.client.post(reverse("novo_livro"), dados)
+        self.assertEqual(resposta.status_code, 302)
+        livro = Livro.objects.get(nome="Três temas")
+        self.assertCountEqual(livro.categorias.all(), categorias)
+        self.assertEqual(livro.exemplares.count(), 2)
+        for rota in [reverse("catalogo"), reverse("acervo"),
+                     reverse("detalhe_livro", args=[livro.pk])]:
+            resposta = self.client.get(rota)
+            self.assertContains(resposta, "Clássico, Literatura, Romance")
+        resposta = self.client.get(reverse("editar_livro", args=[livro.pk]))
+        self.assertCountEqual(resposta.context["form"].initial["categorias"], categorias)
+        dados["categorias"] = ids[1:]
+        resposta = self.client.post(reverse("editar_livro", args=[livro.pk]), dados)
+        self.assertEqual(resposta.status_code, 302)
+        self.assertCountEqual(livro.categorias.all(), categorias[1:])
+
+    def test_categorias_invalidas_nao_alteram_livro_nem_criam_exemplares(self):
+        ids = [self.categoria.pk] + [
+            Categoria.objects.create(nome=f"Tema {i}").pk for i in range(3)
+        ]
+        self.client.force_login(self.biblio)
+        for selecionadas in [[], ids, [999999]]:
+            for rota in [reverse("novo_livro"), reverse("editar_livro", args=[self.livro.pk])]:
+                with self.subTest(categorias=selecionadas, rota=rota):
+                    resposta = self.client.post(rota, {
+                        "nome": "Não deve salvar", "autor": "Autora",
+                        "categorias": selecionadas, "quantidade": 2,
+                    })
+                    self.assertEqual(resposta.status_code, 200)
+                    self.assertIn("categorias", resposta.context["form"].errors)
+                    if len(selecionadas) == 4:
+                        self.assertContains(resposta, "Selecione no máximo 3 categorias por livro.")
+                    self.assertEqual(Livro.objects.count(), 1)
+                    self.assertEqual(Exemplar.objects.count(), 1)
+                    self.livro.refresh_from_db()
+                    self.assertEqual(self.livro.nome, "Dom Casmurro")
+                    self.assertCountEqual(self.livro.categorias.all(), [self.categoria])
+
+    def test_filtro_multiplas_categorias_sem_duplicar_livros_ou_contagens(self):
+        romance = Categoria.objects.create(nome="Romance")
+        ciencia = Categoria.objects.create(nome="Ciência")
+        self.livro.categorias.add(romance)
+        outro = Livro.objects.create(nome="Pesquisa", autor="Autora", cadastrado_por=self.biblio)
+        outro.categorias.add(ciencia)
+        Exemplar.objects.create(livro=self.livro, codigo="EX-002")
+        self.login_leitor()
+        resposta = self.client.get(reverse("catalogo"), {
+            "categoria": [self.categoria.pk, romance.pk, ciencia.pk],
+        })
+        self.assertEqual(resposta.context["total"], 2)
+        livros = list(resposta.context["pagina"])
+        self.assertEqual([livro.pk for livro in livros], [self.livro.pk, outro.pk])
+        self.assertEqual(livros[0].disponiveis, 2)
+        self.assertEqual(livros[1].disponiveis, 0)
+        resposta = self.client.get(reverse("catalogo"), {
+            "categoria": [romance.pk, ciencia.pk], "disponivel": "1", "q": "Machado",
+        })
+        self.assertEqual(resposta.context["total"], 1)
+        self.assertEqual(resposta.context["pagina"][0].disponiveis, 2)
+        resposta = self.client.get(reverse("catalogo"), {"q": "Romance"})
+        self.assertEqual(resposta.context["total"], 1)
+        self.assertEqual(resposta.context["pagina"][0].pk, self.livro.pk)
+
+    def test_filtros_preservados_na_paginacao_e_sem_limite_de_tres(self):
+        from urllib.parse import parse_qs
+        categorias = [self.categoria] + [
+            Categoria.objects.create(nome=f"Filtro {i}") for i in range(3)
+        ]
+        for i in range(13):
+            livro = Livro.objects.create(nome=f"Teste {i:02}", autor="Autora", cadastrado_por=self.biblio)
+            livro.categorias.add(categorias[i % 4])
+        self.login_leitor()
+        filtros = {"q": "Teste", "categoria": [str(c.pk) for c in categorias], "page": 2}
+        resposta = self.client.get(reverse("catalogo"), filtros)
+        self.assertEqual(resposta.context["total"], 13)
+        self.assertEqual(len(resposta.context["pagina"]), 1)
+        self.assertEqual(resposta.context["categorias_atuais"], filtros["categoria"])
+        parametros = parse_qs(resposta.context["parametros"])
+        self.assertEqual(parametros, {"q": ["Teste"], "categoria": filtros["categoria"]})
+        for categoria in categorias:
+            self.assertContains(resposta, f'name="categoria" value="{categoria.pk}"\n                   checked')
 
     def test_exemplar_reservado_nao_pode_ser_desativado(self):
         pedido = self.pedido()
@@ -267,7 +359,8 @@ class ConcorrenciaTests(TransactionTestCase):
         leitores = [User.objects.create_user(f"leitor{i}@example.com") for i in range(2)]
         categoria = Categoria.objects.create(nome="Teste")
         livro = Livro.objects.create(nome="Exemplar único", autor="Autor",
-            categoria=categoria, cadastrado_por=biblio)
+            cadastrado_por=biblio)
+        livro.categorias.add(categoria)
         Exemplar.objects.create(livro=livro, codigo="UNICO")
         pedidos = [emprestimos.criar_solicitacao(leitor, livro.pk) for leitor in leitores]
         barreira = Barrier(2)
