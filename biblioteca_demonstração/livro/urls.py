@@ -3,11 +3,13 @@
 from django.urls import path
 
 from . import views
+from .views_ia import assistente
 
 
 urlpatterns = [
     # Área do leitor
     path("home/", views.listar_livros, name="catalogo"),
+    path("assistente/", assistente, name="assistente_livros"),
     path("<int:id_livro>/", views.mostrar_detalhes_livro, name="detalhe_livro"),
     path("<int:id_livro>/solicitar/", views.solicitar_emprestimo, name="solicitar"),
     path("meus-emprestimos/", views.listar_meus_emprestimos, name="meus_emprestimos"),

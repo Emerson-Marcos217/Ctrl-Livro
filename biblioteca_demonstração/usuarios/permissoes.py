@@ -10,7 +10,7 @@ def criar_grupos_e_permissoes(sender, **kwargs):
 
     nome_do_banco = kwargs.get("using", "default")
     Group.objects.using(nome_do_banco).get_or_create(name="Leitor")
-    grupo_bibliotecario, grupo_criado = Group.objects.using(nome_do_banco).get_or_create(
+    grupo_bibliotecario, _ = Group.objects.using(nome_do_banco).get_or_create(
         name="Bibliotecario"
     )
 
@@ -31,5 +31,4 @@ def criar_grupos_e_permissoes(sender, **kwargs):
         codename__in=nomes_das_permissoes,
     )
 
-    for permissao in permissoes_da_equipe:
-        grupo_bibliotecario.permissions.add(permissao)
+    grupo_bibliotecario.permissions.add(*permissoes_da_equipe)

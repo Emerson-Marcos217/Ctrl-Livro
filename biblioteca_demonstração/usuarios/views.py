@@ -34,7 +34,7 @@ def cadastrar_leitor(request):
             try:
                 with transaction.atomic():
                     usuario = formulario.save()
-                    grupo_leitor, grupo_criado = Group.objects.get_or_create(
+                    grupo_leitor, _ = Group.objects.get_or_create(
                         name="Leitor"
                     )
                     usuario.groups.add(grupo_leitor)

@@ -1,10 +1,14 @@
 import os
 from pathlib import Path
 from django.core.management.utils import get_random_secret_key
+from django.core.exceptions import ImproperlyConfigured
+from .banco import configurar_banco
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
 if not SECRET_KEY:
+    if os.environ.get("DJANGO_DEBUG", "1") != "1":
+        raise ImproperlyConfigured("Configure DJANGO_SECRET_KEY antes de desativar DEBUG.")
     secret_file = BASE_DIR / ".local-secret"
     try:
         SECRET_KEY = secret_file.read_text().strip()
@@ -17,7 +21,7 @@ if not SECRET_KEY:
             SECRET_KEY = secret_file.read_text().strip()
 
 DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]"]
+ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,[::1]").split(",")
 INSTALLED_APPS = [
     "django.contrib.admin", "django.contrib.auth",
     "django.contrib.contenttypes", "django.contrib.sessions",
@@ -44,11 +48,14 @@ TEMPLATES = [{
     ]},
 }]
 WSGI_APPLICATION = "biblioteca.wsgi.application"
-DATABASES = {"default": {
-    "ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3",
-    "TEST": {"NAME": BASE_DIR / ".test.sqlite3"},
-    "OPTIONS": {"timeout": 20, "transaction_mode": "IMMEDIATE"},
-}}
+DATABASES = {"default": configurar_banco(os.environ, BASE_DIR)}
+SQL_CONNECT_ATIVO = os.environ.get("SQL_CONNECT_ATIVO", "0") == "1"
+SQL_CONNECT_PROJECT = os.environ.get("SQL_CONNECT_PROJECT", "")
+SQL_CONNECT_LOCATION = os.environ.get("SQL_CONNECT_LOCATION", "")
+SQL_CONNECT_SERVICE = os.environ.get("SQL_CONNECT_SERVICE", "")
+SQL_CONNECT_CONNECTOR = os.environ.get("SQL_CONNECT_CONNECTOR", "biblioteca")
+if SQL_CONNECT_ATIVO and DATABASES["default"]["ENGINE"] != "django.db.backends.postgresql":
+    raise ImproperlyConfigured("SQL Connect exige o mesmo PostgreSQL usado pelo Django. Configure BIBLIOTECA_BANCO=firebase.")
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -67,3 +74,13 @@ LOGIN_REDIRECT_URL = "inicio"
 LOGOUT_REDIRECT_URL = "login"
 SESSION_COOKIE_NAME = "biblioteca_perfis_session"
 CSRF_COOKIE_NAME = "biblioteca_perfis_csrf"
+
+# Provedor explícito; instalar uma chave não muda o destino das mensagens.
+IA_HOSPEDADA = os.environ.get("VERCEL") == "1"
+IA_PROVEDOR = os.environ.get("IA_PROVEDOR", "gemini" if IA_HOSPEDADA or not DEBUG else "ollama").strip().lower()
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
+GEMINI_TIMEOUT = 20  # Por chamada; um pedido pode fazer até duas chamadas.
+IA_PEDIDOS_POR_HORA = 20
+IA_INTERVALO_SEGUNDOS = 5
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:3b")

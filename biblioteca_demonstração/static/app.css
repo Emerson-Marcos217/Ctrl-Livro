@@ -1,5 +1,18 @@
 @charset "UTF-8";
 
+.reading-assistant { max-width: 850px; margin: 0 auto; }
+.reading-conversation { display: grid; gap: 18px; margin-bottom: 24px; }
+.reading-message { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px; overflow-wrap: anywhere; }
+.reading-user { background: var(--primary-light); margin-left: 24px; }
+.reading-message > strong { display: block; margin-bottom: 8px; }
+.reading-text { white-space: pre-wrap; }
+.reading-message p:last-child { margin-bottom: 0; }
+.reading-book { border-top: 1px solid var(--border); padding-top: 20px; margin-top: 20px; }
+.reading-book .link-arrow { margin-top: 12px; }
+.reading-reset { margin-top: 20px; }
+.reading-assistant > .muted { margin-top: 16px; font-size: 13px; }
+.reading-assistant button:disabled { opacity: .6; cursor: wait; }
+
 /* =========================================================
    BIBLIOTECA — IDENTIDADE VISUAL
    ========================================================= */
@@ -14,7 +27,6 @@
   --primary-light: #dce9df;
 
   --accent: #c79a5b;
-  --accent-light: #f4e8d5;
 
   --text: #20322b;
   --muted: #718078;
@@ -34,7 +46,6 @@
   --shadow: 0 12px 32px rgba(24, 53, 42, .10);
   --shadow-lg: 0 22px 60px rgba(24, 53, 42, .14);
 
-  --radius-sm: 9px;
   --radius: 16px;
   --radius-lg: 24px;
 }

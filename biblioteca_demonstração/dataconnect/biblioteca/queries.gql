@@ -1,0 +1,13 @@
+# Apenas o servidor autenticado com IAM pode executar esta operação.
+# As contas dos leitores continuam sendo controladas pelo Django.
+query LivrosDoAcervo($ids: [Int64!]!) @auth(level: NO_ACCESS) {
+  acervoLivros(where: {id: {in: $ids}}, orderBy: [{nome: ASC}, {id: ASC}]) {
+    id
+    nome
+    autor
+    coAutor
+    sinopse
+    disponiveis
+    categorias
+  }
+}

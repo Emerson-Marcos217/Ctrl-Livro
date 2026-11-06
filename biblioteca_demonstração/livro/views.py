@@ -7,6 +7,7 @@ As demais recebem um formulário e executam uma ação.
 from datetime import timedelta
 from uuid import uuid4
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.paginator import Paginator
@@ -17,6 +18,8 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST, require_http_methods
 
 from . import emprestimos
+from .catalogo import catalogo_atual
+from .sql_connect import ErroSQLConnect, livros_do_acervo
 from .forms import (
     FormularioCategoria,
     FormularioExemplar,
@@ -51,15 +54,7 @@ def listar_livros(request):
     ids_categorias = [valor for valor in request.GET.getlist("categoria") if valor.isascii() and valor.isdigit() and len(valor) <= 18]
     somente_disponiveis = request.GET.get("disponivel")
 
-    livros = Livro.objects.filter(ativo=True).prefetch_related("categorias")
-
-    # Cria uma contagem de cópias disponíveis para cada título.
-    livros = livros.annotate(
-        disponiveis=Count(
-            "exemplares",
-            filter=Q(exemplares__status=Exemplar.Status.DISPONIVEL),
-        )
-    )
+    livros = catalogo_atual()
 
     if texto_da_busca:
         livros = livros.filter(
@@ -79,6 +74,12 @@ def listar_livros(request):
     livros = livros.order_by("nome", "id")
     paginador = Paginator(livros, 12)
     pagina = paginador.get_page(request.GET.get("page"))
+
+    if settings.SQL_CONNECT_ATIVO:
+        try:
+            pagina.object_list = livros_do_acervo(pagina.object_list.values_list("pk", flat=True))
+        except ErroSQLConnect:
+            return render(request, "livro/catalogo_indisponivel.html", status=503)
 
     # Mantém a busca quando o leitor passa para a próxima página.
     filtros_da_busca = request.GET.copy()
@@ -352,7 +353,7 @@ def cadastrar_livro(request):
                 formulario.save_m2m()
 
                 quantidade = formulario.cleaned_data["quantidade"]
-                for numero_do_exemplar in range(quantidade):
+                for _ in range(quantidade):
                     codigo_do_exemplar = "EX-" + uuid4().hex[:12].upper()
                     Exemplar.objects.create(
                         livro=livro,

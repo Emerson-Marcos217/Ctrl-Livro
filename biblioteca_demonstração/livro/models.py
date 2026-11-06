@@ -6,6 +6,15 @@ from django.db.models import Q
 from django.utils import timezone
 
 
+class UsoIA(models.Model):
+    """Contador compartilhado entre instâncias; não guarda mensagens nem chaves."""
+
+    usuario = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    inicio = models.DateTimeField(default=timezone.now)
+    ultimo_pedido = models.DateTimeField(default=timezone.now)
+    quantidade = models.PositiveIntegerField(default=0)
+
+
 class Categoria(models.Model):
     """Assunto ou gênero usado para organizar os livros."""
 
