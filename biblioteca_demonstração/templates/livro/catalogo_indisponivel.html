@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block titulo %}Acervo indisponível{% endblock %}
+{% block conteudo %}
+<section class="empty">
+  <h1>Não foi possível carregar o acervo</h1>
+  <p>O serviço do acervo está indisponível no momento. Tente novamente em instantes.</p>
+  <a class="button" href="{% url 'catalogo' %}">Tentar novamente</a>
+</section>
+{% endblock %}

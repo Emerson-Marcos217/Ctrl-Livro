@@ -1,30 +1,22 @@
+# Ctrl-Livro
 
-Projeto em Python, Django 5.2 e SQLite. Requer Python 3.10 ou superior.
+Sistema de biblioteca em Python e Django, com acervo, reservas, empréstimos e
+recomendações por IA. O projeto usa PostgreSQL no Cloud SQL e Firebase SQL
+Connect; SQLite permanece disponível para desenvolvimento. A IA pode usar a
+API Gemini ou o Ollama local.
 
-Abra o PowerShell na pasta que contém o arquivo `manage.py`.
-
-Se ainda não preparou o ambiente:
-
-```powershell rodar um por vez
-py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe manage.py migrate
-```
-
-Para criar um bibliotecário:
+O código da aplicação está na pasta **biblioteca_demonstração**. Execute os
+comandos de instalação, configuração e inicialização dentro dessa pasta:
 
 ```powershell
-.\.venv\Scripts\python.exe manage.py criar_bibliotecario
+cd biblioteca_demonstração
 ```
 
-Informe e-mail, nome, senha e confirmação da senha. A senha não aparece enquanto é digitada.
+- [Instalação e execução](biblioteca_demonstração/README.md)
+- [Banco Firebase e migração dos dados](biblioteca_demonstração/GUIA_FIREBASE.md)
+- [Configuração da IA](biblioteca_demonstração/GUIA_IA.md)
+- [Transferência para outro computador](biblioteca_demonstração/GUIA_TRANSFERENCIA.md)
 
-Para iniciar o site:
-
-```powershell
-.\.venv\Scripts\python.exe manage.py runserver
-```
-
-Acesse http://127.0.0.1:8001/ e mantenha o terminal aberto.
-Para parar, pressione Ctrl+C.
-
+Senhas, chaves, bancos locais, backups e ambientes virtuais não devem ser
+versionados. Configure as credenciais no ambiente em que o site será executado.
+Esta versão prepara as integrações; a publicação na Vercel é uma etapa separada.

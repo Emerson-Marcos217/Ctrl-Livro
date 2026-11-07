@@ -6,6 +6,17 @@ from django.utils import timezone
 from .models import Categoria, Exemplar, Livro
 
 
+class FormularioRecomendacao(forms.Form):
+    pergunta = forms.CharField(
+        label="O que você gostaria de ler?",
+        max_length=1000,
+        widget=forms.Textarea(attrs={
+            "rows": 3,
+            "placeholder": "Ex.: Quero uma aventura com fantasia e amizade.",
+        }),
+    )
+
+
 class FormularioLivro(forms.ModelForm):
     """Usa os campos do modelo Livro para cadastrar ou editar um título."""
 

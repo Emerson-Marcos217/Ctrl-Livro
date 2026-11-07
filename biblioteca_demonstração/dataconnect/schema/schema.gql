@@ -1,0 +1,19 @@
+# As tabelas e restrições são criadas pelas migrations do Django.
+# Esta consulta não copia os dados: lê o mesmo PostgreSQL.
+type AcervoLivro @view(sql: """
+  SELECT l.id, l.nome, l.autor, l.co_autor, l.sinopse,
+    (SELECT count(*) FROM livro_exemplar e
+     WHERE e.livro_id = l.id AND e.status = 'disponivel') AS disponiveis,
+    ARRAY(SELECT c.nome FROM livro_categoria c
+          JOIN livro_livro_categorias lc ON lc.categoria_id = c.id
+          WHERE lc.livro_id = l.id ORDER BY c.nome) AS categorias
+  FROM livro_livro l WHERE l.ativo = true
+""", singular: "acervoLivro", plural: "acervoLivros") {
+  id: Int64
+  nome: String
+  autor: String
+  coAutor: String
+  sinopse: String
+  disponiveis: Int64
+  categorias: [String]
+}

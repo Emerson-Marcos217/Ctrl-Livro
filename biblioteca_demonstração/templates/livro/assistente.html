@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block titulo %}Encontre sua leitura{% endblock %}
+{% block conteudo %}
+<section class="page-heading">
+  <div>
+    <span class="eyebrow">ASSISTENTE DE LEITURA</span>
+    <h1>Uma história para o seu momento.</h1>
+    <p>Conte o que você gosta. Vamos procurar sua próxima leitura no acervo da biblioteca.</p>
+  </div>
+</section>
+
+<div class="reading-assistant">
+  <section aria-label="Conversa com o assistente" class="reading-conversation">
+    {% for turno in conversa %}
+      <article class="reading-message {% if turno.papel == 'leitor' %}reading-user{% endif %}">
+        <strong>{% if turno.papel == 'leitor' %}Você{% else %}Assistente{% endif %}</strong>
+        <p class="reading-text">{{ turno.mensagem }}</p>
+        {% for cartao in turno.cartoes %}
+          <article class="reading-book">
+            <h2><a href="{% url 'detalhe_livro' cartao.livro.pk %}">{{ cartao.livro.nome }}</a></h2>
+            <p>{{ cartao.livro.autor }} · {{ cartao.livro.categorias.all|join:", " }}</p>
+            <p class="reading-text">{{ cartao.motivo }}</p>
+            <span class="badge {% if cartao.livro.disponiveis %}available{% else %}neutral{% endif %}">
+              {% if cartao.livro.disponiveis %}Disponível para solicitar{% else %}Sem exemplar disponível{% endif %}
+            </span>
+            <a class="link-arrow" href="{% url 'detalhe_livro' cartao.livro.pk %}">Conhecer o livro ↗</a>
+          </article>
+        {% endfor %}
+      </article>
+    {% empty %}
+      <div class="reading-message">
+        <strong>Vamos descobrir sua próxima leitura?</strong>
+        <p>Você pode mencionar um gênero, um assunto ou algo que gostou em outro livro.</p>
+        <p class="muted">Experimente: “Gosto de fantasia e viagens. O que você recomenda?”</p>
+      </div>
+    {% endfor %}
+  </section>
+
+  <section class="panel">
+    <form method="post" class="stack" id="reading-form">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <div class="form-field">
+        {{ form.pergunta.label_tag }}{{ form.pergunta.errors }}{{ form.pergunta }}
+      </div>
+      {% if ia_local %}
+        <small>As sugestões são geradas por uma IA local, no computador da biblioteca. Suas mensagens não são enviadas ao Google ou à OpenAI.</small>
+      {% else %}
+        <small>Suas mensagens e informações dos livros são enviadas ao Google Gemini para gerar as sugestões. Evite incluir dados pessoais na pergunta.</small>
+      {% endif %}
+      <button class="button" type="submit" id="reading-submit">Pedir recomendação</button>
+      <p id="reading-status" role="status" hidden>Consultando os livros. Aguarde a resposta…</p>
+    </form>
+    {% if conversa %}
+      <form method="post" class="reading-reset">
+        {% csrf_token %}
+        <button class="text-button" type="submit" name="acao" value="limpar">Começar nova conversa</button>
+      </form>
+    {% endif %}
+  </section>
+  <p class="muted">As sugestões são geradas por IA e podem conter imprecisões. Os títulos e a disponibilidade exibidos vêm do catálogo atual. A conversa considera as últimas três trocas de mensagens.</p>
+</div>
+<script src="{% static 'assistente.js' %}" defer></script>
+{% endblock %}

@@ -1,0 +1,13 @@
+specVersion: "v1"
+serviceId: biblioteca-service
+location: us-east4
+schema:
+  source: ./schema
+  datasource:
+    postgresql:
+      database: biblioteca-database
+      schemaValidation: COMPATIBLE
+      cloudSql:
+        instanceId: biblioteca-38922-instance
+connectorDirs:
+  - ./biblioteca
