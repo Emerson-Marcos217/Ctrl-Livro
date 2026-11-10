@@ -2,6 +2,7 @@
 # Configurado para biblioteca-38922. A senha será solicitada ao executar.
 # Este script NÃO cria serviços nem publica o projeto.
 $env:BIBLIOTECA_BANCO = "firebase"
+$env:BIBLIOTECA_CONEXAO = "proxy"
 $env:PGHOST = "127.0.0.1" # Cloud SQL Auth Proxy executando neste computador
 $env:PGPORT = "5432"
 $env:PGDATABASE = "biblioteca-database"
