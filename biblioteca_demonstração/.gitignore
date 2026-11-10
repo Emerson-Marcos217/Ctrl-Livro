@@ -16,3 +16,6 @@ credenciais/
 firebase-debug.log
 dataconnect-debug.log
 node_modules/
+.vercel/
+staticfiles/
+*.pem

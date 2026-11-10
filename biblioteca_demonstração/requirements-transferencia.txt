@@ -4,3 +4,4 @@ sqlparse==0.6.0
 tzdata==2026.4
 psycopg[binary]>=3.2,<4
 google-auth[requests]>=2.40,<3
+cloud-sql-python-connector[psycopg]==1.23.0

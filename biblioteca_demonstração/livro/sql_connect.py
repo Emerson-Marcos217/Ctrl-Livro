@@ -3,7 +3,7 @@
 import re
 from types import SimpleNamespace
 
-import google.auth
+from biblioteca.credenciais_google import obter_credenciais_google
 from google.auth.exceptions import GoogleAuthError
 from google.auth.transport.requests import AuthorizedSession
 from requests.exceptions import RequestException
@@ -29,7 +29,7 @@ def endereco_conector():
 def executar_consulta(ids):
     url = endereco_conector()
     try:
-        credenciais, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+        credenciais = obter_credenciais_google()
         with AuthorizedSession(credenciais) as sessao:
             resposta = sessao.post(url, json={
                 "operationName": "LivrosDoAcervo",

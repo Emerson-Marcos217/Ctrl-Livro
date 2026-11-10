@@ -1,7 +1,11 @@
 
 Projeto em Python e Django 5.2. Usa SQLite no desenvolvimento e tem integração
 preparada com Firebase SQL Connect e seu PostgreSQL no Cloud SQL.
-Requer Python 3.10 ou superior.
+Requer Python 3.11 ou superior; a hospedagem está configurada para Python 3.14.
+
+Para preparar a publicação na Vercel com Cloud SQL e Gemini, siga
+[GUIA_VERCEL.md](GUIA_VERCEL.md). A configuração hospedada usa o conector oficial
+do Google, sem depender do proxy aberto em um computador.
 
 Para configurar o banco online, transferir os dados e ativar a consulta do acervo
 pelo Firebase, siga [GUIA_FIREBASE.md](GUIA_FIREBASE.md).

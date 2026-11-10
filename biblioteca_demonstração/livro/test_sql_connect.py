@@ -34,7 +34,7 @@ class ConfiguracaoBancoTests(SimpleTestCase):
                    SQL_CONNECT_SERVICE="biblioteca", SQL_CONNECT_CONNECTOR="biblioteca")
 class ClienteSQLConnectTests(SimpleTestCase):
     @patch("livro.sql_connect.AuthorizedSession")
-    @patch("livro.sql_connect.google.auth.default", return_value=(Mock(), None))
+    @patch("livro.sql_connect.obter_credenciais_google", return_value=Mock())
     def test_consulta_autenticada_com_timeout_sem_redirecionamento(self, credenciais, sessao):
         post = sessao.return_value.__enter__.return_value.post
         post.return_value.status_code = 200

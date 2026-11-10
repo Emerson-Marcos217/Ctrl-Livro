@@ -1,4 +1,5 @@
 Django>=5.2,<5.3
 psycopg[binary]>=3.2,<4
 google-auth[requests]>=2.40,<3
+cloud-sql-python-connector[psycopg]==1.23.0
 
