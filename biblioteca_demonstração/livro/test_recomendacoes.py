@@ -320,6 +320,54 @@ class RecomendacaoFundamentadaTests(TestCase):
         ia.assert_called_once()
 
     @patch("livro.recomendacoes.consultar_ia")
+    def test_flexoes_romanticas_recomendam_a_mesma_categoria(self, ia):
+        for palavra in ("romântico", "romântica", "românticos", "românticas", "romantico", "ROMÂNTICA", "romances"):
+            for tipo in ("categoria", "tema"):
+                with self.subTest(palavra=palavra, tipo=tipo):
+                    ia.reset_mock()
+                    ia.return_value = {"criterios": [
+                        {"tipo": tipo, "valor": palavra, "excluir": False},
+                    ]}
+                    r = recomendar(f"Quero algo {palavra}", [])
+                    self.assertCountEqual([s["id"] for s in r["recomendacoes"]],
+                                          [self.orgulho.pk, self.casmurro.pk])
+                    self.assertTrue(all("Categoria cadastrada: “Romance”" in s["motivo"]
+                                        for s in r["recomendacoes"]))
+                    ia.assert_called_once()
+
+    @patch("livro.recomendacoes.consultar_ia")
+    def test_flexao_romantica_nao_remove_ambientacao(self, ia):
+        ia.return_value = {"criterios": [
+            {"tipo": "categoria", "valor": "romântico", "excluir": False},
+            {"tipo": "ambientacao", "valor": "Inglaterra rural", "excluir": False},
+        ]}
+        r = recomendar("Quero um livro romântico na Inglaterra rural", [])
+        self.assertEqual([s["id"] for s in r["recomendacoes"]], [self.orgulho.pk])
+
+    @patch("livro.recomendacoes.consultar_ia")
+    def test_exclusao_romantica_respeita_masculino_e_feminino(self, ia):
+        for palavra in ("romântico", "romântica"):
+            with self.subTest(palavra=palavra):
+                ia.return_value = {"criterios": [
+                    {"tipo": "tema", "valor": palavra, "excluir": True},
+                ]}
+                r = recomendar(f"Não quero nada {palavra}", [])
+                self.assertEqual([s["id"] for s in r["recomendacoes"]], [self.principe.pk])
+
+    @patch("livro.recomendacoes.consultar_ia")
+    def test_categoria_cadastrada_com_flexao_preserva_evidencia_original(self, ia):
+        self.romance.nome = "Romântica"
+        self.romance.save()
+        ia.return_value = {"criterios": [
+            {"tipo": "categoria", "valor": "romance", "excluir": False},
+        ]}
+        r = recomendar("Quero romance", [])
+        self.assertCountEqual([s["id"] for s in r["recomendacoes"]],
+                              [self.orgulho.pk, self.casmurro.pk])
+        self.assertTrue(all("Categoria cadastrada: “Romântica”" in s["motivo"]
+                            for s in r["recomendacoes"]))
+
+    @patch("livro.recomendacoes.consultar_ia")
     def test_ambientacao_nao_usa_nacionalidade_do_autor(self, ia):
         self.principe.autor = "Escritor da França"
         self.principe.save()
@@ -426,7 +474,178 @@ class RecomendacaoFundamentadaTests(TestCase):
                 consultar_ia({"pedido": "Quero romance"}, etapa="preferencias")
 
 
+class AmbientacaoEuropeiaTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.leitor = get_user_model().objects.create_user("teste-europa")
+        cls.romance = Categoria.objects.create(nome="Romance")
+        cls.aventura = Categoria.objects.create(nome="Aventura")
+        cls.franca = Livro.objects.create(cadastrado_por=cls.leitor, nome="Cartas de Paris",
+            sinopse="Durante uma temporada na França, Júlia conhece um músico e se apaixona.")
+        cls.franca.categorias.add(cls.romance)
+        cls.inglaterra = Livro.objects.create(cadastrado_por=cls.leitor, nome="O mapa perdido",
+            sinopse="Uma viagem pela Inglaterra leva dois amigos a um farol abandonado.")
+        cls.inglaterra.categorias.add(cls.aventura)
+        cls.brasil = Livro.objects.create(cadastrado_por=cls.leitor, nome="O reencontro",
+            sinopse="Ambientado no Brasil, o romance acompanha um reencontro em Salvador.")
+        cls.brasil.categorias.add(cls.romance)
+        cls.sem_local = Livro.objects.create(cadastrado_por=cls.leitor, nome="França no título",
+            autor="Autora da Inglaterra", sinopse="Uma família tenta reconstruir seus laços.")
+        cls.sem_local.categorias.add(cls.romance)
+
+    @patch("livro.recomendacoes.consultar_ia")
+    def test_historia_europeia_encontra_paises_com_evidencia_original(self, ia):
+        for tipo in ("ambientacao", "tema", "categoria"):
+            for valor in ("europeia", "europeu", "Europa"):
+                with self.subTest(tipo=tipo, valor=valor):
+                    ia.reset_mock()
+                    ia.return_value = {"criterios": [
+                        {"tipo": tipo, "valor": valor, "excluir": False},
+                    ]}
+                    r = recomendar("me recomende uma historia europeia", [])
+                    self.assertCountEqual([s["id"] for s in r["recomendacoes"]],
+                                          [self.franca.pk, self.inglaterra.pk])
+                    motivos = "\n".join(s["motivo"] for s in r["recomendacoes"])
+                    self.assertIn(self.franca.sinopse, motivos)
+                    self.assertIn(self.inglaterra.sinopse, motivos)
+                    ia.assert_called_once()
+
+    @patch("livro.recomendacoes.consultar_ia")
+    def test_romance_europeu_respeita_os_dois_criterios(self, ia):
+        ia.return_value = {"criterios": [
+            {"tipo": "categoria", "valor": "romance", "excluir": False},
+            {"tipo": "ambientacao", "valor": "Europa", "excluir": False},
+        ]}
+        r = recomendar("Quero um romance europeu", [])
+        self.assertEqual([s["id"] for s in r["recomendacoes"]], [self.franca.pk])
+
+    @patch("livro.recomendacoes.consultar_ia")
+    def test_excluir_europa_impede_livros_na_franca_e_inglaterra(self, ia):
+        ia.return_value = {"criterios": [
+            {"tipo": "tema", "valor": "europeia", "excluir": True},
+        ]}
+        r = recomendar("Não quero uma história europeia", [])
+        self.assertCountEqual([s["id"] for s in r["recomendacoes"]],
+                              [self.brasil.pk, self.sem_local.pk])
+
+    @patch("livro.recomendacoes.consultar_ia")
+    def test_pais_especifico_nao_se_expande_para_toda_europa(self, ia):
+        ia.return_value = {"criterios": [
+            {"tipo": "ambientacao", "valor": "França", "excluir": False},
+        ]}
+        r = recomendar("Quero uma história francesa", [])
+        self.assertEqual([s["id"] for s in r["recomendacoes"]], [self.franca.pk])
+
+    @patch("livro.recomendacoes.consultar_ia")
+    def test_europa_nao_autoriza_modelo_a_escolher_um_pais_arbitrario(self, ia):
+        ia.return_value = {"criterios": [
+            {"tipo": "ambientacao", "valor": "França", "excluir": False},
+        ]}
+        with self.assertRaises(ErroRecomendacao):
+            recomendar("Quero uma história europeia", [])
+
+    @patch("livro.recomendacoes.consultar_ia")
+    def test_continuacao_europeia_preserva_genero(self, ia):
+        ia.return_value = {"criterios": [
+            {"tipo": "categoria", "valor": "Romance", "excluir": False},
+            {"tipo": "ambientacao", "valor": "Europa", "excluir": False},
+        ]}
+        historico = [{"papel": "leitor", "mensagem": "Quero romance"}]
+        r = recomendar("Que seja uma história europeia", historico)
+        self.assertEqual([s["id"] for s in r["recomendacoes"]], [self.franca.pk])
+
+    def test_evidencia_inventada_ou_de_outro_local_e_rejeitada(self):
+        from .preferencias import motivo_comprovado
+        livro = {"sinopse": self.brasil.sinopse, "categorias": ["Romance"]}
+        criterios = [{"tipo": "ambientacao", "valores": ["Europa"], "excluir": False}]
+        for trecho in (self.brasil.sinopse, "A história se passa na França."):
+            with self.subTest(trecho=trecho):
+                self.assertIsNone(motivo_comprovado(livro, criterios, [
+                    {"criterio": 0, "trecho": trecho},
+                ]))
+
+
+class AmbientacaoFuturaTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.leitor = get_user_model().objects.create_user("teste-futuro")
+        categoria = Categoria.objects.create(nome="Ficção científica")
+        cls.futuro = Livro.objects.create(
+            cadastrado_por=cls.leitor, nome="A Cidade Depois do Amanhã", autor="Renata Avelar",
+            sinopse="Em 2147, uma inteligência artificial administra os serviços de São Paulo, do transporte à distribuição de água.",
+        )
+        cls.futuro.categorias.add(categoria)
+        cls.passado = Livro.objects.create(
+            cadastrado_por=cls.leitor, nome="O Experimento de 1984",
+            sinopse="Em 1984, uma pesquisadora desenvolve um computador experimental na França.",
+        )
+        cls.passado.categorias.add(categoria)
+
+    @patch("livro.recomendacoes.consultar_ia")
+    def test_futuristica_e_futuro_sao_avaliados_pela_sinopse(self, ia):
+        for tipo in ("ambientacao", "tema", "categoria"):
+            for valor in ("futurística", "futurista", "futuro"):
+                with self.subTest(tipo=tipo, valor=valor):
+                    ia.reset_mock()
+                    ia.side_effect = [
+                        {"criterios": [{"tipo": tipo, "valor": valor, "excluir": False}]},
+                        {"recomendacoes": [{"id": self.futuro.pk, "evidencias": [
+                            {"criterio": 0, "trecho": self.futuro.sinopse},
+                        ]}]},
+                    ]
+                    r = recomendar("quero uma historia futurística", [])
+                    self.assertEqual([s["id"] for s in r["recomendacoes"]], [self.futuro.pk])
+                    self.assertIn(self.futuro.sinopse, r["recomendacoes"][0]["motivo"])
+                    self.assertEqual(ia.call_count, 2)
+                    self.assertEqual(ia.call_args.args[0]["criterios"][0]["tipo"], "tema")
+
+    @patch("livro.recomendacoes.consultar_ia")
+    def test_futuro_nao_ignora_o_local_pedido(self, ia):
+        ia.return_value = {"criterios": [
+            {"tipo": "ambientacao", "valor": "futuro", "excluir": False},
+            {"tipo": "ambientacao", "valor": "França", "excluir": False},
+        ]}
+        def responder(dados, **kwargs):
+            if kwargs.get("etapa") == "preferencias":
+                return ia.return_value
+            self.assertEqual([l["id"] for l in dados["catalogo"]], [self.passado.pk])
+            return {"recomendacoes": []}
+        ia.side_effect = responder
+        r = recomendar("Quero uma história no futuro que se passe na França", [])
+        self.assertEqual(r["recomendacoes"], [])
+
+    @patch("livro.recomendacoes.consultar_ia")
+    def test_futuro_continua_exigindo_evidencia_literal(self, ia):
+        ia.side_effect = [
+            {"criterios": [{"tipo": "tema", "valor": "futurística", "excluir": False}]},
+            {"recomendacoes": [{"id": self.passado.pk, "evidencias": [
+                {"criterio": 0, "trecho": "No futuro, uma pesquisadora vive na França."},
+            ]}]},
+        ]
+        self.assertEqual(recomendar("Quero uma história futurística", [])["recomendacoes"], [])
+
+
 class InterpretacaoSimplesTests(TestCase):
+    @patch("livro.recomendacoes.consultar_ia")
+    def test_modelo_pode_devolver_outra_flexao_da_mesma_preferencia(self, ia):
+        from .recomendacoes import interpretar_preferencias
+        for valor in ("Romance", "romântica", "romântico"):
+            with self.subTest(valor=valor):
+                ia.return_value = {"criterios": [
+                    {"tipo": "categoria", "valor": valor, "excluir": False},
+                ]}
+                r = interpretar_preferencias("Quero um livro romântico", [], ["Romance"])
+                self.assertEqual(r["criterios"][0]["valores"], ["Romance"])
+
+    @patch("livro.recomendacoes.consultar_ia")
+    def test_flexoes_nao_alteram_nomes_de_autores(self, ia):
+        from .recomendacoes import interpretar_preferencias
+        ia.return_value = {"criterios": [
+            {"tipo": "autor", "valor": "Autor Romântica", "excluir": False},
+        ]}
+        with self.assertRaises(ErroRecomendacao):
+            interpretar_preferencias("Quero um livro de Autor Romântico", [], ["Romance"])
+
     @patch("livro.recomendacoes.consultar_ia")
     def test_romance_simples_nao_exige_origem_repetida(self, ia):
         from .recomendacoes import interpretar_preferencias
